@@ -40,11 +40,11 @@ impl RGBA{
     }
 }
 
-impl Cell {
+impl CellConway {
     pub fn to_rgba(&self) -> RGBA {
         match *self {
-            Cell::Dead => RGBA::black(),
-            Cell::Alive => RGBA::white(),
+            Self::Dead => RGBA::black(),
+            Self::Alive => RGBA::white(),
         }
     }
 }
@@ -66,7 +66,7 @@ impl VisualGame {
             pixel_buffer,
         }
     }
-    pub fn evolve(&mut self) -> &GameBoard {
+    pub fn evolve(&mut self) -> &GameBoard<CellConway> {
         self.game.evolve()
     }
     pub fn update_pixel_buffer(&mut self) {

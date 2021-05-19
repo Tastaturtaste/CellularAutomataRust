@@ -1,34 +1,44 @@
 use crate::game_board::*;
 use crate::game_rules::*;
 
+use rayon::prelude::*;
+
 
 #[derive(Clone)]
 pub struct ConwaysGame {
-    board: GameBoard,
-    scratch_board: GameBoard,
-}
-
-impl GameRule for ConwaysGame {
-    fn apply(cell: &Cell, neighbor_iter: NeighborhoodIterator) -> Cell {
-        conways_rule(cell, neighbor_iter)
-    }
+    rule: ConwayRule,
+    board: GameBoard<CellConway>,
+    scratch_board: GameBoard<CellConway>,
 }
 
 impl ConwaysGame {
     pub fn new(width: u16, height: u16) -> ConwaysGame {
-        let board = GameBoard::new(width,height);
-        ConwaysGame{ board: board.clone(), scratch_board: board}
+        let board = GameBoard::new(width,height, CellConway::Dead);
+        ConwaysGame{rule: ConwayRule{}, board: board.clone(), scratch_board: board}
     }
     pub fn new_rand(width: u16, height: u16) -> ConwaysGame {
-        let board = GameBoard::new_rand(width, height);
-        ConwaysGame{board: board.clone(), scratch_board: board}
+        let board = GameBoard::new_rand(width, height, CellConway::Dead);
+        ConwaysGame{rule: ConwayRule{}, board: board.clone(), scratch_board: board}
     }
-    pub fn get_board(&self) -> &GameBoard {
+    pub fn get_board(&self) -> &GameBoard<CellConway> {
         &self.board
     }
-    pub fn evolve(&mut self) -> &GameBoard {
-        let (width, height) = self.board.dim();
-        self.scratch_board = GameBoard::from_slice(&mut self.iter(&self.board).collect::<Vec<Cell>>(), width, height).unwrap();
+    pub fn evolve(&mut self) -> &GameBoard<CellConway> {
+
+        // let _ = (&mut self.scratch_board).into_iter()
+        // .zip(self.rule.iter(&self.board))
+        // // .par_bridge()
+        // .map(|(scratch,new)|{*scratch = new;});
+
+        // (&mut self.scratch_board).into_par_iter()
+        // .zip(self.rule.iter(&self.board))
+        // .par_bridge()
+        // .for_each(|(scratch, new)| *scratch = new);
+
+        (&mut self.scratch_board).into_iter()
+        .zip(self.rule.iter(&self.board))
+        .for_each(|(scratch,new)| *scratch = new);
+
         self.board.swap(&mut self.scratch_board);
         &self.board
     }
