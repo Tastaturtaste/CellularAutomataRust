@@ -9,6 +9,9 @@ edition = "2018"
 # [profile.release]
 # debug = true
 
+[profile.dev]
+opt-level = 1
+
 [dependencies]
 winit = "0.25.0"
 pixels = "0.3.0"
