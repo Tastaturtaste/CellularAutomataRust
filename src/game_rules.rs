@@ -1,4 +1,5 @@
 use crate::cell::*;
+use crate::game_board::iter::*;
 use crate::game_board::*;
 
 pub trait GameRule: Copy {

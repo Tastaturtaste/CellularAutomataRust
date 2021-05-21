@@ -18,15 +18,15 @@ impl<'a, C: Cell> Iterator for GameBoardIterator<'a, C> {
         //     self.offset += 2;
         //     debug_assert!(self.offset < self.end, "GameBoardIterator in invalid state!");
         // }
-        self.offset += 2 * ((self.offset % self.board.inner_width) == 0) as usize;
+        self.offset = outer_index_skip_border(self.offset, self.board.outer_width);
         // Bound checks are done above and should not be repeated
-        let result = unsafe { self.board.get_unchecked_index_inner(self.offset) };
+        let result = unsafe { self.board.get_unchecked_index_outer(self.offset) };
         self.offset += 1;
         Some(result)
     }
     // fn next(&mut self) -> Option<Self::Item> {
     //     self.iter.next()
-    //     // self.range.into_iter().filter(|i| self.board.check_index(i)).map(|i| self.board.cells.get_unchecked(i))
+    // self.range.into_iter().filter(|i| self.board.check_index(i)).map(|i| self.board.cells.get_unchecked(i))
     // }
 }
 impl<'a, C: Cell> GameBoardIterator<'a, C> {
@@ -47,10 +47,10 @@ impl<'a, C: Cell> Iterator for GameBoardMutIterator<'a, C> {
         if self.offset == self.end {
             return None;
         }
-        self.offset += 2 * ((self.offset % self.board.inner_width) == 0) as usize;
+        self.offset = outer_index_skip_border(self.offset, self.board.outer_width);
         // Bound checks are done above and should not be repeated
         // Use unsafe pointer to convince the compiler that no two calls to next result in a reference to the same object
-        let ptr = unsafe { self.board.get_unchecked_mut_index_inner(self.offset) as *mut C };
+        let ptr = unsafe { self.board.get_unchecked_mut_index_outer(self.offset) as *mut C };
         self.offset += 1;
         unsafe { ptr.as_mut() }
     }
@@ -128,9 +128,16 @@ pub struct NeighborhoodIterator<'a, C: Cell> {
 impl<'a, C: Cell> Iterator for NeighborhoodIterator<'a, C> {
     type Item = &'a C;
     fn next(&mut self) -> Option<Self::Item> {
+        // let i = self.center + self.offset_iter.next()?;
+        // debug_assert!(self.board.cells.len() > i as usize && 0 <= i);
+        // unsafe { Some(self.board.get_unchecked_index_inner(i as usize)) }
         let i = self.center + self.offset_iter.next()?;
         debug_assert!(self.board.cells.len() > i as usize && 0 <= i);
-        unsafe { Some(self.board.get_unchecked_index_inner(i as usize)) }
+        Some(
+            self.board
+                .get_index_outer(i as usize)
+                .expect("Indices should be strictly valid!"),
+        )
     }
 }
 impl<'a, C: Cell> NeighborhoodIterator<'a, C> {
@@ -155,12 +162,12 @@ pub struct LocalGroupIterator<'a, C: Cell> {
 impl<'a, C: Cell> Iterator for LocalGroupIterator<'a, C> {
     type Item = (&'a C, NeighborhoodIterator<'a, C>);
     fn next(&mut self) -> Option<Self::Item> {
-        self.center += 2 * ((self.center % self.board.inner_width) == 0) as usize;
+        self.center = outer_index_skip_border(self.center, self.board.outer_width);
         // Bound checks are done above and should not be repeated
         let result = Some((
-            unsafe { self.board.get_unchecked_index_inner(self.center as usize) },
+            unsafe { self.board.get_unchecked_index_outer(self.center as usize) },
             // self.board.get_index_inner(self.center as usize)?,
-            self.board.iter_neighbors_index_inner(self.center),
+            self.board.iter_neighbors_index_outer(self.center),
         ));
         self.center += 1;
         result
@@ -170,4 +177,8 @@ impl<'a, C: Cell> LocalGroupIterator<'a, C> {
     pub fn new(board: &'a GameBoard<C>, center: usize) -> LocalGroupIterator<'a, C> {
         LocalGroupIterator { board, center }
     }
+}
+
+fn outer_index_skip_border(index: usize, outer_width: usize) -> usize {
+    index + 2 * ((index % outer_width) == (outer_width - 1)) as usize
 }

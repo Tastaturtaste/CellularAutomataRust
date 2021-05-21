@@ -5,6 +5,8 @@ mod game_rules;
 mod globals;
 use globals::OVERFLOW_MSG;
 
+use std::time::{self, Duration, Instant};
+
 use core::f32;
 use std::convert::TryInto;
 
@@ -13,11 +15,13 @@ use game::*;
 use game_board::*;
 
 use pixels;
-use winit::event::Event as WinEvent;
 use winit::{
-    dpi::{self, PhysicalPosition},
-    event, event_loop, window,
+    dpi::{self, PhysicalPosition, PhysicalSize},
+    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event_loop::{ControlFlow, EventLoop},
+    window::{Window, WindowBuilder},
 };
+// use winit_input_helper::WinitInputHelper;
 
 pub struct RGBA([u8; 4]);
 
@@ -61,15 +65,18 @@ impl CellConway {
 pub struct VisualGame {
     game: ConwaysGame,
     pixel_buffer: pixels::Pixels,
+    update_time: f32,
+    frame_time: f32,
+    paused: bool,
 }
 
 impl VisualGame {
-    pub fn new(
-        width: usize,
-        height: usize,
-        dpi_factor: f32,
-        window: &window::Window,
-    ) -> VisualGame {
+    pub fn new(width: usize, height: usize, dpi_factor: f32, window: &Window) -> VisualGame {
+        let width = (width as f32 / dpi_factor).round() as usize;
+        let height = (height as f32 / dpi_factor).round() as usize;
+
+        let game = ConwaysGame::new_rand(width, height);
+
         let surface = pixels::SurfaceTexture::new(
             width.try_into().expect(OVERFLOW_MSG),
             height.try_into().expect(OVERFLOW_MSG),
@@ -81,16 +88,31 @@ impl VisualGame {
             surface,
         )
         .expect("Cannot create pixel texture!");
-        let width = (width as f32 / dpi_factor).round() as usize;
-        let height = (height as f32 / dpi_factor).round() as usize;
         pixel_buffer.resize_buffer(width as u32, height as u32);
+
+        let update_time = 1. / 4.;
+        let frame_time = 1. / 25.; // Das menschliche Auge kann nur 24 fps sehen. Deshalb 24 fps +1 für die Sicherheit
+        let paused = false;
+
         VisualGame {
-            game: ConwaysGame::new_rand(width, height),
+            game,
             pixel_buffer,
+            update_time,
+            frame_time,
+            paused,
         }
     }
-    pub fn evolve(&mut self) -> &GameBoard<CellConway> {
-        self.game.evolve()
+    pub fn evolve(&mut self) {
+        if !self.paused {
+            self.game.evolve();
+        }
+    }
+    pub fn step(&mut self) {
+        debug_assert!(
+            !self.paused,
+            "The step method should only be used in the paused state."
+        );
+        self.game.evolve();
     }
     pub fn update_pixel_buffer(&mut self) {
         for (pixel, rgba) in self
@@ -107,16 +129,8 @@ impl VisualGame {
     }
 }
 
-pub struct WindowWrapper {
-    window: window::Window,
-    size: dpi::Size,
-    dpi_factor: f32,
-}
-fn make_window(
-    title: &str,
-    event_loop: &event_loop::EventLoop<()>,
-) -> (window::Window, dpi::PhysicalSize<u32>, f32) {
-    let window = window::WindowBuilder::new()
+fn make_window(title: &str, event_loop: &EventLoop<()>) -> (Window, dpi::PhysicalSize<u32>, f32) {
+    let window = WindowBuilder::new()
         .with_position(PhysicalPosition::new(0, 0))
         .with_visible(false)
         .with_title(title)
@@ -151,38 +165,97 @@ fn make_window(
 }
 
 fn main() {
-    let event_loop = event_loop::EventLoop::new();
+    let event_loop = EventLoop::new();
+
     let (window, window_size, dpi_factor) = make_window("Game of Life", &event_loop);
     let mut vgame = VisualGame::new(
         window_size.width as usize,
         window_size.height as usize,
-        dpi_factor,
+        16 as f32,
+        // dpi_factor,
         &window,
     );
-
+    let mut last_game_update = std::time::Instant::now();
+    let mut last_render = Instant::now();
     event_loop.run(move |event, _, control_flow| {
-        *control_flow = event_loop::ControlFlow::Poll;
+        *control_flow = ControlFlow::Poll;
 
         match event {
-            WinEvent::WindowEvent {
-                event: event::WindowEvent::CloseRequested,
-                ..
-            } => {
-                println!("The close button was pressed; stopping");
-                *control_flow = event_loop::ControlFlow::Exit;
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    println!("The close button was pressed; stopping");
+                    *control_flow = ControlFlow::Exit;
+                }
+                WindowEvent::Resized(size) => {
+                    vgame.pixel_buffer.resize_surface(size.width, size.height);
+                    window.request_redraw();
+                }
+                WindowEvent::KeyboardInput { input, .. } => {
+                    handle_keyboard_input(input, &mut vgame, &window);
+                }
+                _ => {}
+            },
+            Event::MainEventsCleared => {
+                let now = Instant::now();
+                let update_delay = now - last_game_update;
+                let render_delay = now - last_render;
+                if update_delay.as_secs_f32() >= vgame.update_time {
+                    vgame.evolve();
+                    last_game_update = Instant::now();
+                }
+                if render_delay.as_secs_f32() >= vgame.frame_time {
+                    window.request_redraw();
+                }
             }
-            WinEvent::MainEventsCleared => {
-                window.request_redraw();
-            }
-            WinEvent::RedrawRequested(_) => {
-                vgame.evolve();
+            Event::RedrawRequested(_) => {
                 vgame.update_pixel_buffer();
                 if vgame.render().is_err() {
-                    *control_flow = event_loop::ControlFlow::Exit;
+                    eprintln!("Error: Could not render to pixel buffer!");
+                    *control_flow = ControlFlow::Exit;
                     return;
+                } else {
+                    last_render = Instant::now();
                 }
             }
             _ => (),
         }
     });
+}
+
+fn handle_keyboard_input(input: KeyboardInput, game: &mut VisualGame, window: &Window) {
+    let KeyboardInput {
+        scancode,
+        state,
+        virtual_keycode,
+        modifiers,
+    } = input;
+    if state == ElementState::Released {
+        return;
+    }
+    match virtual_keycode {
+        Some(VirtualKeyCode::Space) => game.paused = !game.paused,
+        Some(VirtualKeyCode::NumpadAdd) => {
+            if modifiers.ctrl() {
+                game.frame_time *= 0.9;
+                println!("Decrease frame_time");
+            } else {
+                game.update_time *= 0.9;
+                println!("Decreased update_time");
+            }
+        }
+        Some(VirtualKeyCode::NumpadSubtract) => {
+            if modifiers.ctrl() {
+                game.frame_time *= 1.1;
+                println!("Increased frame_time");
+            } else {
+                game.update_time *= 1.1;
+                println!("Increased update_time")
+            }
+        }
+        Some(VirtualKeyCode::Return) => {
+            game.step();
+            window.request_redraw();
+        }
+        _ => {}
+    }
 }

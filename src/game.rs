@@ -19,7 +19,7 @@ impl ConwaysGame {
         }
     }
     pub fn new_rand(width: usize, height: usize) -> ConwaysGame {
-        let board = GameBoard::new_rand(width, height);
+        let board = GameBoard::new_rand(width, height, CellConway::Dead);
         ConwaysGame {
             rule: ConwayRule {},
             board: board.clone(),
