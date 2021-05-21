@@ -5,7 +5,10 @@ mod game_rules;
 mod globals;
 use globals::OVERFLOW_MSG;
 
-use std::time::{self, Duration, Instant};
+use std::{
+    ops::{Add, Sub},
+    time::{self, Duration, Instant},
+};
 
 use core::f32;
 use std::convert::TryInto;
@@ -69,6 +72,7 @@ pub struct VisualGame {
     frame_time: Duration,
     paused: bool,
     cell_size: f32, // float because dpi scaling can be rational
+    trail_decay: f32,
 }
 
 impl VisualGame {
@@ -94,7 +98,7 @@ impl VisualGame {
         let update_time = Duration::new(1, 0).div_f32(4.);
         let frame_time = Duration::new(1, 0).div_f32(25.); // Das menschliche Auge kann nur 24 fps sehen. Deshalb 24 fps +1 für die Sicherheit
         let paused = false;
-
+        let trail_decay = 0.9;
         VisualGame {
             game,
             pixel_buffer,
@@ -102,6 +106,7 @@ impl VisualGame {
             frame_time,
             paused,
             cell_size,
+            trail_decay,
         }
     }
     pub fn evolve(&mut self) {
@@ -117,13 +122,20 @@ impl VisualGame {
         self.game.evolve();
     }
     pub fn update_pixel_buffer(&mut self) {
-        for (pixel, rgba) in self
+        for (pixel, c) in self
             .pixel_buffer
             .get_frame()
             .chunks_exact_mut(4)
-            .zip(self.game.get_board().into_iter().map(|c| c.to_rgba()))
+            .zip(self.game.get_board().into_iter())
         {
-            pixel.copy_from_slice(&rgba.get_raw());
+            if *c == CellConway::Alive {
+                pixel.copy_from_slice(&c.to_rgba().get_raw());
+            } else {
+                let trail_decay = &self.trail_decay;
+                pixel
+                    .iter_mut()
+                    .for_each(|byte| *byte = (*byte as f32 * trail_decay) as u8);
+            }
         }
     }
     pub fn render(&mut self) -> Result<(), pixels::Error> {
@@ -222,21 +234,39 @@ fn handle_keyboard_input(
     match virtual_keycode {
         Some(VirtualKeyCode::P) => game.paused = !game.paused,
         Some(VirtualKeyCode::NumpadAdd) => {
-            if modifier_state.ctrl() {
-                game.frame_time = game.frame_time.mul_f32(0.9);
-                println!("Decrease frame_time");
-            } else {
-                game.update_time = game.update_time.mul_f32(0.9);
-                println!("Decreased update_time");
+            match *modifier_state {
+                ModifiersState::CTRL => {
+                    game.frame_time = game.frame_time.mul_f32(0.9);
+                    println!("Decrease frame_time");
+                }
+                ModifiersState::SHIFT => {
+                    // Since a smaller value implies a higher decay rate we add to make decay faster
+                    game.trail_decay += 0.1;
+                    game.trail_decay = game.trail_decay.clamp(0.0, 1.0);
+                    println!("Increased decay constant to {}", game.trail_decay);
+                }
+                _ => {
+                    game.update_time = game.update_time.mul_f32(0.9);
+                    println!("Decreased update_time");
+                }
             }
         }
         Some(VirtualKeyCode::NumpadSubtract) => {
-            if modifier_state.ctrl() {
-                game.frame_time = game.frame_time.mul_f32(1.1);
-                println!("Increased frame_time");
-            } else {
-                game.update_time = game.update_time.mul_f32(1.1);
-                println!("Increased update_time")
+            match *modifier_state {
+                ModifiersState::CTRL => {
+                    game.frame_time = game.frame_time.mul_f32(1.1);
+                    println!("Increased frame_time");
+                }
+                ModifiersState::SHIFT => {
+                    // Since a bigger value implies a lower decay rate we subtract to make decay slower
+                    game.trail_decay -= 0.1;
+                    game.trail_decay = game.trail_decay.clamp(0.0, 1.0);
+                    println!("Decreased decay rate to {}", game.trail_decay);
+                }
+                _ => {
+                    game.update_time = game.update_time.mul_f32(1.1);
+                    println!("Increased update_time")
+                }
             }
         }
         Some(VirtualKeyCode::Space) => {
