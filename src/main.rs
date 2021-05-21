@@ -17,7 +17,7 @@ use game_board::*;
 use pixels;
 use winit::{
     dpi::{self, PhysicalPosition, PhysicalSize},
-    event::{ElementState, Event, KeyboardInput, VirtualKeyCode, WindowEvent},
+    event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
@@ -65,15 +65,16 @@ impl CellConway {
 pub struct VisualGame {
     game: ConwaysGame,
     pixel_buffer: pixels::Pixels,
-    update_time: f32,
-    frame_time: f32,
+    update_time: Duration,
+    frame_time: Duration,
     paused: bool,
+    cell_size: f32, // float because dpi scaling can be rational
 }
 
 impl VisualGame {
-    pub fn new(width: usize, height: usize, dpi_factor: f32, window: &Window) -> VisualGame {
-        let width = (width as f32 / dpi_factor).round() as usize;
-        let height = (height as f32 / dpi_factor).round() as usize;
+    pub fn new(width: usize, height: usize, cell_size: f32, window: &Window) -> VisualGame {
+        let width = (width as f32 / cell_size as f32).round() as usize;
+        let height = (height as f32 / cell_size as f32).round() as usize;
 
         let game = ConwaysGame::new_rand(width, height);
 
@@ -90,8 +91,8 @@ impl VisualGame {
         .expect("Cannot create pixel texture!");
         pixel_buffer.resize_buffer(width as u32, height as u32);
 
-        let update_time = 1. / 4.;
-        let frame_time = 1. / 25.; // Das menschliche Auge kann nur 24 fps sehen. Deshalb 24 fps +1 für die Sicherheit
+        let update_time = Duration::new(1, 0).div_f32(4.);
+        let frame_time = Duration::new(1, 0).div_f32(25.); // Das menschliche Auge kann nur 24 fps sehen. Deshalb 24 fps +1 für die Sicherheit
         let paused = false;
 
         VisualGame {
@@ -100,6 +101,7 @@ impl VisualGame {
             update_time,
             frame_time,
             paused,
+            cell_size,
         }
     }
     pub fn evolve(&mut self) {
@@ -126,6 +128,122 @@ impl VisualGame {
     }
     pub fn render(&mut self) -> Result<(), pixels::Error> {
         self.pixel_buffer.render()
+    }
+    pub fn on_clear(&mut self) {
+        (&mut self.game)
+            .get_board_mut()
+            .into_iter()
+            .for_each(|c: &mut CellConway| *c = CellConway::Dead);
+    }
+}
+
+fn main() {
+    let event_loop = EventLoop::new();
+
+    let (window, window_size, dpi_factor) = make_window("Game of Life", &event_loop);
+    let cell_size = dpi_factor * 2 as f32;
+    let mut vgame = VisualGame::new(
+        window_size.width as usize,
+        window_size.height as usize,
+        cell_size,
+        &window,
+    );
+    let mut last_game_update = std::time::Instant::now();
+    let mut last_render = Instant::now();
+    let mut last_update_duration = Duration::new(0, 0); // Store the time required per update to enable more accurate frame and update intervals
+    let mut modifier_state = ModifiersState::empty();
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    println!("The close button was pressed; stopping");
+                    *control_flow = ControlFlow::Exit;
+                }
+                WindowEvent::Resized(size) => {
+                    vgame.pixel_buffer.resize_surface(size.width, size.height);
+                    window.request_redraw();
+                }
+                WindowEvent::ModifiersChanged(state) => {
+                    modifier_state = state;
+                }
+                WindowEvent::KeyboardInput { input, .. } => {
+                    handle_keyboard_input(input, &modifier_state, &mut vgame, &window);
+                }
+                mouse_input @ WindowEvent::MouseInput { .. } => {}
+                _ => {}
+            },
+            Event::MainEventsCleared => {
+                let begin = Instant::now();
+                let update_delay = begin - last_game_update;
+                let render_delay = begin - last_render;
+                if (update_delay + last_update_duration) >= vgame.update_time {
+                    vgame.evolve();
+                    last_game_update = Instant::now();
+                    last_update_duration = last_game_update - begin;
+                }
+                if render_delay >= vgame.frame_time {
+                    window.request_redraw();
+                }
+            }
+            Event::RedrawRequested(_) => {
+                vgame.update_pixel_buffer();
+                if vgame.render().is_err() {
+                    eprintln!("Error: Could not render to pixel buffer!");
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                } else {
+                    last_render = Instant::now();
+                }
+            }
+            _ => (),
+        }
+    });
+}
+
+fn handle_keyboard_input(
+    input: KeyboardInput,
+    modifier_state: &ModifiersState,
+    game: &mut VisualGame,
+    window: &Window,
+) {
+    let KeyboardInput {
+        scancode: _,
+        state,
+        virtual_keycode,
+        //modifiers,
+        ..
+    } = input;
+    if state == ElementState::Released {
+        return;
+    }
+    match virtual_keycode {
+        Some(VirtualKeyCode::P) => game.paused = !game.paused,
+        Some(VirtualKeyCode::NumpadAdd) => {
+            if modifier_state.ctrl() {
+                game.frame_time = game.frame_time.mul_f32(0.9);
+                println!("Decrease frame_time");
+            } else {
+                game.update_time = game.update_time.mul_f32(0.9);
+                println!("Decreased update_time");
+            }
+        }
+        Some(VirtualKeyCode::NumpadSubtract) => {
+            if modifier_state.ctrl() {
+                game.frame_time = game.frame_time.mul_f32(1.1);
+                println!("Increased frame_time");
+            } else {
+                game.update_time = game.update_time.mul_f32(1.1);
+                println!("Increased update_time")
+            }
+        }
+        Some(VirtualKeyCode::Space) => {
+            game.step();
+            window.request_redraw();
+        }
+        _ => {}
     }
 }
 
@@ -162,100 +280,4 @@ fn make_window(title: &str, event_loop: &EventLoop<()>) -> (Window, dpi::Physica
         dpi::PhysicalSize::new(inner_size.width as u32, inner_size.height as u32),
         dpi_factor as f32,
     )
-}
-
-fn main() {
-    let event_loop = EventLoop::new();
-
-    let (window, window_size, dpi_factor) = make_window("Game of Life", &event_loop);
-    let mut vgame = VisualGame::new(
-        window_size.width as usize,
-        window_size.height as usize,
-        16 as f32,
-        // dpi_factor,
-        &window,
-    );
-    let mut last_game_update = std::time::Instant::now();
-    let mut last_render = Instant::now();
-    event_loop.run(move |event, _, control_flow| {
-        *control_flow = ControlFlow::Poll;
-
-        match event {
-            Event::WindowEvent { event, .. } => match event {
-                WindowEvent::CloseRequested => {
-                    println!("The close button was pressed; stopping");
-                    *control_flow = ControlFlow::Exit;
-                }
-                WindowEvent::Resized(size) => {
-                    vgame.pixel_buffer.resize_surface(size.width, size.height);
-                    window.request_redraw();
-                }
-                WindowEvent::KeyboardInput { input, .. } => {
-                    handle_keyboard_input(input, &mut vgame, &window);
-                }
-                _ => {}
-            },
-            Event::MainEventsCleared => {
-                let now = Instant::now();
-                let update_delay = now - last_game_update;
-                let render_delay = now - last_render;
-                if update_delay.as_secs_f32() >= vgame.update_time {
-                    vgame.evolve();
-                    last_game_update = Instant::now();
-                }
-                if render_delay.as_secs_f32() >= vgame.frame_time {
-                    window.request_redraw();
-                }
-            }
-            Event::RedrawRequested(_) => {
-                vgame.update_pixel_buffer();
-                if vgame.render().is_err() {
-                    eprintln!("Error: Could not render to pixel buffer!");
-                    *control_flow = ControlFlow::Exit;
-                    return;
-                } else {
-                    last_render = Instant::now();
-                }
-            }
-            _ => (),
-        }
-    });
-}
-
-fn handle_keyboard_input(input: KeyboardInput, game: &mut VisualGame, window: &Window) {
-    let KeyboardInput {
-        scancode,
-        state,
-        virtual_keycode,
-        modifiers,
-    } = input;
-    if state == ElementState::Released {
-        return;
-    }
-    match virtual_keycode {
-        Some(VirtualKeyCode::Space) => game.paused = !game.paused,
-        Some(VirtualKeyCode::NumpadAdd) => {
-            if modifiers.ctrl() {
-                game.frame_time *= 0.9;
-                println!("Decrease frame_time");
-            } else {
-                game.update_time *= 0.9;
-                println!("Decreased update_time");
-            }
-        }
-        Some(VirtualKeyCode::NumpadSubtract) => {
-            if modifiers.ctrl() {
-                game.frame_time *= 1.1;
-                println!("Increased frame_time");
-            } else {
-                game.update_time *= 1.1;
-                println!("Increased update_time")
-            }
-        }
-        Some(VirtualKeyCode::Return) => {
-            game.step();
-            window.request_redraw();
-        }
-        _ => {}
-    }
 }

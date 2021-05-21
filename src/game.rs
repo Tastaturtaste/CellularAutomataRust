@@ -29,6 +29,9 @@ impl ConwaysGame {
     pub fn get_board(&self) -> &GameBoard<CellConway> {
         &self.board
     }
+    pub fn get_board_mut(&mut self) -> &mut GameBoard<CellConway> {
+        &mut self.board
+    }
     pub fn evolve(&mut self) -> &GameBoard<CellConway> {
         // let _ = (&mut self.scratch_board).into_iter()
         // .zip(self.rule.iter(&self.board))
