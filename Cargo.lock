@@ -497,6 +497,7 @@ dependencies = [
 name = "game_of_life"
 version = "0.1.0"
 dependencies = [
+ "line_drawing",
  "pixels",
  "rand 0.8.3",
  "rayon",
@@ -841,6 +842,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "line_drawing"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f81902e542483002b103c6424d23e765c2e5a65f732923299053a601bce50ab2"
+dependencies = [
+ "num-traits 0.1.43",
+]
+
+[[package]]
 name = "lock_api"
 version = "0.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -965,7 +975,7 @@ dependencies = [
  "bitflags",
  "fxhash",
  "log",
- "num-traits",
+ "num-traits 0.2.14",
  "petgraph",
  "spirv_headers",
  "thiserror",
@@ -1057,6 +1067,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f6bb902e437b6d86e03cce10a7e2af662292c5dfef23b65899ea3ac9354ad44"
 dependencies = [
  "winapi",
+]
+
+[[package]]
+name = "num-traits"
+version = "0.1.43"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92e5113e9fd4cc14ded8e499429f396a20f98c772a47cc8622a736e1ec843c31"
+dependencies = [
+ "num-traits 0.2.14",
 ]
 
 [[package]]
@@ -1464,7 +1483,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1f5b132530b1ac069df335577e3581765995cba5a13995cdbbdbc8fb057c532c"
 dependencies = [
  "bitflags",
- "num-traits",
+ "num-traits 0.2.14",
 ]
 
 [[package]]

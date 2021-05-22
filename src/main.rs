@@ -5,22 +5,20 @@ mod game_rules;
 mod globals;
 use globals::OVERFLOW_MSG;
 
-use std::{
-    ops::{Add, Sub},
-    time::{self, Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use core::f32;
 use std::convert::TryInto;
 
 use cell::*;
 use game::*;
-use game_board::*;
-
 use pixels;
 use winit::{
-    dpi::{self, PhysicalPosition, PhysicalSize},
-    event::{ElementState, Event, KeyboardInput, ModifiersState, VirtualKeyCode, WindowEvent},
+    dpi::{self, PhysicalPosition},
+    event::{
+        ElementState, Event, KeyboardInput, ModifiersState, MouseButton, VirtualKeyCode,
+        WindowEvent,
+    },
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
@@ -109,17 +107,17 @@ impl VisualGame {
             trail_decay,
         }
     }
-    pub fn evolve(&mut self) {
+    pub fn step(&mut self) {
         if !self.paused {
-            self.game.evolve();
+            self.game.step();
         }
     }
-    pub fn step(&mut self) {
+    pub fn step_ignore_pause(&mut self) {
         debug_assert!(
             !self.paused,
             "The step method should only be used in the paused state."
         );
-        self.game.evolve();
+        self.game.step();
     }
     pub fn update_pixel_buffer(&mut self) {
         for (pixel, c) in self
@@ -141,12 +139,37 @@ impl VisualGame {
     pub fn render(&mut self) -> Result<(), pixels::Error> {
         self.pixel_buffer.render()
     }
-    pub fn on_clear(&mut self) {
-        (&mut self.game)
-            .get_board_mut()
-            .into_iter()
-            .for_each(|c: &mut CellConway| *c = CellConway::Dead);
+}
+
+struct MouseState {
+    position: PhysicalPosition<f64>,
+    left: ElementState,
+    right: ElementState,
+    middle: ElementState,
+}
+enum MouseUpdate {
+    Position(PhysicalPosition<f64>),
+    Left(ElementState),
+    Right(ElementState),
+    Middle(ElementState),
+}
+impl MouseState {
+    pub fn update_button(&mut self, input: MouseInput) {
+        match input.button {
+            MouseButton::Left => self.left = input.state,
+            MouseButton::Right => self.right = input.state,
+            MouseButton::Middle => self.middle = input.state,
+            _ => {}
+        }
     }
+    pub fn update_position(&mut self, position: PhysicalPosition<f64>) {
+        self.position = position;
+    }
+}
+
+struct MouseInput {
+    state: ElementState,
+    button: MouseButton,
 }
 
 fn main() {
@@ -164,6 +187,12 @@ fn main() {
     let mut last_render = Instant::now();
     let mut last_update_duration = Duration::new(0, 0); // Store the time required per update to enable more accurate frame and update intervals
     let mut modifier_state = ModifiersState::empty();
+    let mut mouse_state = MouseState {
+        position: PhysicalPosition { x: 0., y: 0. },
+        left: ElementState::Released,
+        right: ElementState::Released,
+        middle: ElementState::Released,
+    };
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -182,17 +211,25 @@ fn main() {
                     modifier_state = state;
                 }
                 WindowEvent::KeyboardInput { input, .. } => {
-                    handle_keyboard_input(input, &modifier_state, &mut vgame, &window);
+                    on_keyboard_input(input, &modifier_state, &mut vgame, &window);
                 }
-                mouse_input @ WindowEvent::MouseInput { .. } => {}
+                WindowEvent::CursorMoved { position, .. } => {
+                    mouse_state.update_position(position);
+                    on_mouse_state_updated(&mouse_state, &modifier_state, &mut vgame, &window)
+                }
+                WindowEvent::MouseInput { button, state, .. } => {
+                    mouse_state.update_button(MouseInput { button, state });
+                    on_mouse_state_updated(&mouse_state, &modifier_state, &mut vgame, &window)
+                }
                 _ => {}
             },
+
             Event::MainEventsCleared => {
                 let begin = Instant::now();
                 let update_delay = begin - last_game_update;
                 let render_delay = begin - last_render;
                 if (update_delay + last_update_duration) >= vgame.update_time {
-                    vgame.evolve();
+                    vgame.step();
                     last_game_update = Instant::now();
                     last_update_duration = last_game_update - begin;
                 }
@@ -215,7 +252,15 @@ fn main() {
     });
 }
 
-fn handle_keyboard_input(
+fn on_mouse_state_updated(
+    mouse_state: &MouseState,
+    modifier_state: &ModifiersState,
+    vgame: &mut VisualGame,
+    window: &Window,
+) {
+}
+
+fn on_keyboard_input(
     input: KeyboardInput,
     modifier_state: &ModifiersState,
     game: &mut VisualGame,
@@ -270,7 +315,7 @@ fn handle_keyboard_input(
             }
         }
         Some(VirtualKeyCode::Space) => {
-            game.step();
+            game.step_ignore_pause();
             window.request_redraw();
         }
         _ => {}
