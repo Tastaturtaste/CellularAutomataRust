@@ -19,10 +19,9 @@ use winit::{
         ElementState, Event, KeyboardInput, ModifiersState, MouseButton, VirtualKeyCode,
         WindowEvent,
     },
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     window::{Window, WindowBuilder},
 };
-// use winit_input_helper::WinitInputHelper;
 
 pub struct RGBA([u8; 4]);
 
@@ -96,7 +95,7 @@ impl VisualGame {
         let update_time = Duration::new(1, 0).div_f32(4.);
         let frame_time = Duration::new(1, 0).div_f32(25.); // Das menschliche Auge kann nur 24 fps sehen. Deshalb 24 fps +1 für die Sicherheit
         let paused = false;
-        let trail_decay = 0.9;
+        let trail_decay = 0.0; //0.9;
         VisualGame {
             game,
             pixel_buffer,
@@ -141,18 +140,18 @@ impl VisualGame {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum UserEvent {
+    StepCell { x: usize, y: usize },
+}
+
 struct MouseState {
     position: PhysicalPosition<f64>,
     left: ElementState,
     right: ElementState,
     middle: ElementState,
 }
-enum MouseUpdate {
-    Position(PhysicalPosition<f64>),
-    Left(ElementState),
-    Right(ElementState),
-    Middle(ElementState),
-}
+
 impl MouseState {
     pub fn update_button(&mut self, input: MouseInput) {
         match input.button {
@@ -172,11 +171,17 @@ struct MouseInput {
     button: MouseButton,
 }
 
+struct GameContext {
+    last_cell_stepped: Option<(usize, usize)>,
+}
+
 fn main() {
-    let event_loop = EventLoop::new();
+    // let event_loop = EventLoop::new();
+    let event_loop = EventLoop::<UserEvent>::with_user_event();
+    let event_loop_proxy = event_loop.create_proxy();
 
     let (window, window_size, dpi_factor) = make_window("Game of Life", &event_loop);
-    let cell_size = dpi_factor * 2 as f32;
+    let cell_size = dpi_factor * 8 as f32;
     let mut vgame = VisualGame::new(
         window_size.width as usize,
         window_size.height as usize,
@@ -184,7 +189,6 @@ fn main() {
         &window,
     );
     let mut last_game_update = std::time::Instant::now();
-    let mut last_render = Instant::now();
     let mut last_update_duration = Duration::new(0, 0); // Store the time required per update to enable more accurate frame and update intervals
     let mut modifier_state = ModifiersState::empty();
     let mut mouse_state = MouseState {
@@ -192,6 +196,9 @@ fn main() {
         left: ElementState::Released,
         right: ElementState::Released,
         middle: ElementState::Released,
+    };
+    let mut game_context = GameContext {
+        last_cell_stepped: None,
     };
 
     event_loop.run(move |event, _, control_flow| {
@@ -215,25 +222,42 @@ fn main() {
                 }
                 WindowEvent::CursorMoved { position, .. } => {
                     mouse_state.update_position(position);
-                    on_mouse_state_updated(&mouse_state, &modifier_state, &mut vgame, &window)
+                    on_mouse_state_updated(
+                        &mouse_state,
+                        &modifier_state,
+                        &mut vgame,
+                        &mut game_context,
+                        &window,
+                        &event_loop_proxy,
+                    )
                 }
                 WindowEvent::MouseInput { button, state, .. } => {
                     mouse_state.update_button(MouseInput { button, state });
-                    on_mouse_state_updated(&mouse_state, &modifier_state, &mut vgame, &window)
+                    on_mouse_state_updated(
+                        &mouse_state,
+                        &modifier_state,
+                        &mut vgame,
+                        &mut game_context,
+                        &window,
+                        &event_loop_proxy,
+                    )
                 }
                 _ => {}
             },
-
+            Event::UserEvent(user_event) => on_user_event(
+                user_event,
+                &mut vgame,
+                &mut game_context,
+                &window,
+                &event_loop_proxy,
+            ),
             Event::MainEventsCleared => {
                 let begin = Instant::now();
                 let update_delay = begin - last_game_update;
-                let render_delay = begin - last_render;
                 if (update_delay + last_update_duration) >= vgame.update_time {
                     vgame.step();
                     last_game_update = Instant::now();
                     last_update_duration = last_game_update - begin;
-                }
-                if render_delay >= vgame.frame_time {
                     window.request_redraw();
                 }
             }
@@ -243,8 +267,6 @@ fn main() {
                     eprintln!("Error: Could not render to pixel buffer!");
                     *control_flow = ControlFlow::Exit;
                     return;
-                } else {
-                    last_render = Instant::now();
                 }
             }
             _ => (),
@@ -252,12 +274,48 @@ fn main() {
     });
 }
 
+// Should not depend on raw input state such as key presses, modifier state or mouse state
+// That should already be translated into a specific game event
+fn on_user_event(
+    event: UserEvent,
+    vgame: &mut VisualGame,
+    game_context: &mut GameContext,
+    window: &Window,
+    event_loop_proxy: &EventLoopProxy<UserEvent>,
+) {
+    match event {
+        UserEvent::StepCell { x, y } => {
+            if let Some((last_x, last_y)) = game_context.last_cell_stepped {
+                if last_x == x && last_y == y {
+                    return;
+                }
+            }
+            vgame.game.step_cell(x, y);
+            game_context.last_cell_stepped = Some((x, y));
+        }
+        _ => {}
+    }
+}
+
 fn on_mouse_state_updated(
     mouse_state: &MouseState,
     modifier_state: &ModifiersState,
     vgame: &mut VisualGame,
+    game_context: &mut GameContext,
     window: &Window,
+    event_loop_proxy: &EventLoopProxy<UserEvent>,
 ) {
+    let (x, y) = vgame
+        .pixel_buffer
+        .window_pos_to_pixel(mouse_state.position.into())
+        .unwrap_or_else(|pos| vgame.pixel_buffer.clamp_pixel_pos(pos));
+    if let ElementState::Pressed = mouse_state.left {
+        event_loop_proxy
+            .send_event(UserEvent::StepCell { x, y })
+            .expect("Sending event to a proxy event loop failed!");
+    } else {
+        game_context.last_cell_stepped = None;
+    }
 }
 
 fn on_keyboard_input(
@@ -322,7 +380,7 @@ fn on_keyboard_input(
     }
 }
 
-fn make_window(title: &str, event_loop: &EventLoop<()>) -> (Window, dpi::PhysicalSize<u32>, f32) {
+fn make_window<T>(title: &str, event_loop: &EventLoop<T>) -> (Window, dpi::PhysicalSize<u32>, f32) {
     let window = WindowBuilder::new()
         .with_position(PhysicalPosition::new(0, 0))
         .with_visible(false)
