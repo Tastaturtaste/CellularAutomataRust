@@ -32,7 +32,7 @@ impl Visuals {
     pub fn update_pixel_buffer<T: traits::CellGame>(
         &mut self,
         game: &T,
-        f_decay: fn(&T::Cell) -> bool,
+        overwrite_decaying: fn(&T::Cell) -> bool,
     ) {
         for (pixel, c) in self
             .pixel_buffer
@@ -41,7 +41,9 @@ impl Visuals {
             .zip(game.get_board().into_iter())
         {
             let rgba = c.to_rgba();
-            if !f_decay(c) {
+            if overwrite_decaying(c) {
+                pixel.copy_from_slice(&rgba.get_raw());
+            } else {
                 let decay_multiplier = self.decay_multiplier;
                 pixel
                     .iter_mut()
@@ -51,8 +53,6 @@ impl Visuals {
                             + *new_rgba as f32 * decay_multiplier)
                             as u8
                     })
-            } else {
-                pixel.copy_from_slice(&rgba.get_raw());
             }
         }
     }

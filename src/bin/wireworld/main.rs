@@ -11,7 +11,11 @@ fn main() {
     let height = 1440 / cell_size;
     let border_cell = cell::WireCell::Off;
     let game = wireworld::WireGame::new(width, height, border_cell);
-    let decay_decider = |_c: &WireCell| false;
-    let game_runner = GameRunner::new(decay_decider);
+    let overwrite_decaying = |c: &WireCell| match *c {
+        WireCell::ElectronHead => true,
+        WireCell::ElectronTail => true,
+        _ => false,
+    };
+    let game_runner = GameRunner::new(overwrite_decaying);
     game_runner.run(game, "Wireworld");
 }

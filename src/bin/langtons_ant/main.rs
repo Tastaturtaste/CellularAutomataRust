@@ -140,7 +140,11 @@ fn main() {
     let width = 2550 / 8;
     let height = 1440 / 8;
     let game = LangtonsGame::new(width, height, LangtonsCell::Black(None));
-    let decay_decider = |c: &LangtonsCell| false;
-    let game_runner = GameRunner::new(decay_decider);
+    let overwrite_decaying = |c: &LangtonsCell| match *c {
+        White(Some(_)) => true,
+        Black(Some(_)) => true,
+        _ => false,
+    };
+    let game_runner = GameRunner::new(overwrite_decaying);
     game_runner.run(game, "Langton's Ant");
 }

@@ -58,7 +58,7 @@ pub struct GameContext {
 }
 
 pub struct GameRunner<CG: 'static + CellGameTrait> {
-    decay_decider: fn(&CG::Cell) -> bool,
+    overwrite_decaying: fn(&CG::Cell) -> bool,
     event_loop: EventLoop<UserEvent>,
 }
 
@@ -66,7 +66,7 @@ impl<CG: CellGameTrait> GameRunner<CG> {
     pub fn new(decay_decider: fn(&CG::Cell) -> bool) -> Self {
         let event_loop = EventLoop::<UserEvent>::with_user_event();
         Self {
-            decay_decider,
+            overwrite_decaying: decay_decider,
             event_loop,
         }
     }
@@ -82,7 +82,7 @@ impl<CG: CellGameTrait> GameRunner<CG> {
             .expect("Could not construct fullscreen window!");
         //let dpi_scaling = window.scale_factor();
         let mut visuals = Visuals::new(game_dim.0, game_dim.1, window);
-        let decay_decider = self.decay_decider;
+        let decay_decider = self.overwrite_decaying;
         let mut game_context = GameContext {
             last_cell_stepped: None,
             update_time: Duration::from_secs_f32(1. / 4.),
