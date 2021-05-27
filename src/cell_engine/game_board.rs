@@ -29,32 +29,7 @@ impl<'a, C: Cell> GameBoard<C> {
             neighbor_lookup: build_neighbor_lookup(outer_width),
         }
     }
-
-    pub fn new_rand(width: usize, height: usize, border_cell: C) -> Self {
-        let outer_width = width + 2;
-        let outer_height = height + 2;
-        let num_nodes = outer_width * outer_height;
-        let mut cells = Vec::new();
-
-        cells.reserve(num_nodes);
-        for i in 0..(num_nodes) {
-            let (x, y) = index_to_coord(i, outer_width);
-            let is_border = check_border(x, y, outer_width, outer_height);
-            if is_border {
-                cells.push(border_cell)
-            } else {
-                cells.push(Cell::new_rand());
-            }
-        }
-        Self {
-            outer_width,
-            outer_height,
-            width,
-            height,
-            cells,
-            neighbor_lookup: build_neighbor_lookup(outer_width),
-        }
-    }
+    
     pub fn iter(&self) -> GameBoardIterator<'_, C> {
         //let iter =(self.outer_width + 1..self.cells.len() - self.outer_width).into_iter().filter(move |&i| self.check_index(i)).map(move |i| unsafe {self.cells.get_unchecked(i)});
         // GameBoardIterator {
@@ -111,6 +86,33 @@ impl<'a, C: Cell> GameBoard<C> {
             panic!("GameBoards cannot swap because of unequal dimension!");
         }
         std::mem::swap(&mut self.cells, &mut other.cells);
+    }
+}
+impl<'a, C: RandomCell> GameBoard<C> {
+    pub fn new_rand(width: usize, height: usize, border_cell: C) -> Self {
+        let outer_width = width + 2;
+        let outer_height = height + 2;
+        let num_nodes = outer_width * outer_height;
+        let mut cells = Vec::new();
+
+        cells.reserve(num_nodes);
+        for i in 0..(num_nodes) {
+            let (x, y) = index_to_coord(i, outer_width);
+            let is_border = check_border(x, y, outer_width, outer_height);
+            if is_border {
+                cells.push(border_cell)
+            } else {
+                cells.push(C::new_rand());
+            }
+        }
+        Self {
+            outer_width,
+            outer_height,
+            width,
+            height,
+            cells,
+            neighbor_lookup: build_neighbor_lookup(outer_width),
+        }
     }
 }
 
@@ -214,73 +216,27 @@ fn coord_from_outer(x: usize, y: usize) -> (usize, usize) {
 }
 
 #[cfg(test)]
-mod tests {
-    #[allow(unused_imports)]
+mod tests{
     use super::*;
-    use crate::cell::CellConway::*;
-
-
+    use crate::cell::mock::*;
     #[test]
-    fn test_index_roundtrip(){
-        let (width,height) = (5,5);
-        let board = GameBoard::new(width,height, CellConway::Dead);
-        for i_inner in 0..width*height{
-            let i_outer = board.index_to_outer(i_inner);
-            assert!(i_inner == board.index_from_outer(i_outer));
+fn test_coord_roundtrip() {
+    let (width, height) = (5, 5);
+    for x_inner in 0..width {
+        for y_inner in 0..height {
+            let (x_outer, y_outer) = coord_to_outer(x_inner, y_inner);
+            let (x_back, y_back) = coord_from_outer(x_outer, y_outer);
+            assert!(x_back == x_inner && y_back == y_inner);
         }
     }
-    #[test]
-    fn test_coord_roundtrip() {
-        let (width,height) = (5,5);
-        for x_inner in 0..width {
-            for y_inner in 0..height {
-                let (x_outer, y_outer) = coord_to_outer(x_inner, y_inner);
-                let (x_back, y_back) = coord_from_outer(x_outer, y_outer);
-                assert!(x_back == x_inner && y_back == y_inner);
-            }
-        }
+}
+#[test]
+fn test_index_roundtrip() {
+    let (width, height) = (5, 5);
+    let board = GameBoard::new(width, height, CellConway::Dead);
+    for i_inner in 0..width * height {
+        let i_outer = board.index_to_outer(i_inner);
+        assert!(i_inner == board.index_from_outer(i_outer));
     }
-
-    #[test]
-    fn iterate_neighborhood() {
-        let (width, height) = (5,5);
-        let mut board = GameBoard::new(width, height, Dead);
-        board.set(0, 0, Alive);
-        for (i,n) in board.iter_neighbors(0, 0).enumerate() {
-            println!("Neighbor {}: {:?}", i,n);
-        }
-    }
-    #[test]
-    fn neighbor_counter() {
-        let (width, height) = (5,5);
-        let mut board = GameBoard::new(width, height, Dead);
-        for c in &mut board {
-            *c = Alive;
-        }
-        let sum: i32 = board
-            .iter_neighbors(0, 0)
-            .map(|c| match c {
-                Dead => 0,
-                Alive => 1,
-            })
-            .sum();
-        assert_eq!(sum, 3);
-    }
-    #[test]
-    fn iterate_board() {
-        let board = GameBoard::new(10, 10, Dead);
-        for n in board.iter() {
-            println!("{:?}", n);
-        }
-    }
-    #[test]
-    fn iterate_board_and_set_alive() {
-        let mut board = GameBoard::new(10, 10, Dead);
-        for n in board.iter_mut() {
-            *n = Alive;
-        }
-        for n in board.iter() {
-            println!("{:?}", n);
-        }
-    }
+}
 }

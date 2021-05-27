@@ -1,0 +1,208 @@
+mod cell;
+mod game_of_life;
+mod globals;
+use cell::{Cell, CellConway};
+use cell_engine::{
+    game::traits::{CellGame as CellGameTrait, RandCellGame as RandCellGameTrait},
+    visuals::Visuals,
+};
+use game_of_life::ConwaysGame;
+use std::time::{Duration, Instant};
+
+use core::f32;
+use pixels;
+use std::convert::TryInto;
+use winit::{
+    dpi::{self, PhysicalPosition},
+    event::{
+        ElementState, Event, KeyboardInput, ModifiersState, MouseButton, VirtualKeyCode,
+        WindowEvent,
+    },
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
+    window::{Window, WindowBuilder},
+};
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+enum UserEvent {
+    StepCell { x: usize, y: usize },
+}
+
+struct GameContext {
+    last_cell_stepped: Option<(usize, usize)>,
+    update_time: Duration,
+    paused: bool,
+}
+
+fn main() {
+    // let event_loop = EventLoop::new();
+    let event_loop = EventLoop::<UserEvent>::with_user_event();
+    let event_loop_proxy = event_loop.create_proxy();
+
+    let (window, window_size, dpi_factor) = make_window("Game of Life", &event_loop);
+    let cell_size = (dpi_factor * 8.0) as usize;
+    let game_size = (
+        window_size.width as usize / cell_size,
+        window_size.height as usize / cell_size,
+    );
+    let mut game = ConwaysGame::new_rand(game_size.0, game_size.1, CellConway::Dead);
+    let game_size = game.dim();
+    let mut visuals = Visuals::new(game_size.0, game_size.1, window);
+    let mut last_game_update = std::time::Instant::now();
+    let mut last_update_duration = Duration::new(0, 0); // Store the time required per update to enable more accurate frame and update intervals
+    let mut modifier_state = ModifiersState::empty();
+    let mut mouse_state = MouseState {
+        position: PhysicalPosition { x: 0., y: 0. },
+        left: ElementState::Released,
+        right: ElementState::Released,
+        middle: ElementState::Released,
+    };
+    let mut game_context = GameContext {
+        last_cell_stepped: None,
+        update_time: Duration::from_secs_f32(1. / 4.),
+        paused: false,
+    };
+
+    let decay_decider: fn(&CellConway) -> bool = |c| {
+        if *c == CellConway::Alive {
+            return true;
+        }
+        return false;
+    };
+
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Poll;
+
+        match event {
+            Event::WindowEvent { event, .. } => match event {
+                WindowEvent::CloseRequested => {
+                    println!("The close button was pressed; stopping");
+                    *control_flow = ControlFlow::Exit;
+                }
+                WindowEvent::Resized(size) => {
+                    visuals.resize_surface(size.width, size.height);
+                    visuals.get_window().request_redraw();
+                }
+                WindowEvent::ModifiersChanged(state) => {
+                    modifier_state = state;
+                }
+                WindowEvent::KeyboardInput { input, .. } => {
+                    on_keyboard_input(
+                        input,
+                        &modifier_state,
+                        &mut visuals,
+                        &mut game,
+                        &mut game_context,
+                    );
+                }
+                WindowEvent::CursorMoved { position, .. } => {
+                    mouse_state.update_position(position);
+                    on_mouse_state_updated(
+                        &mouse_state,
+                        &modifier_state,
+                        &mut visuals,
+                        &mut game_context,
+                        &event_loop_proxy,
+                    )
+                }
+                WindowEvent::MouseInput { button, state, .. } => {
+                    mouse_state.update_button(MouseInput { button, state });
+                    on_mouse_state_updated(
+                        &mouse_state,
+                        &modifier_state,
+                        &mut visuals,
+                        &mut game_context,
+                        &event_loop_proxy,
+                    )
+                }
+                _ => {}
+            },
+            Event::UserEvent(user_event) => on_user_event(
+                user_event,
+                &mut game,
+                &mut game_context,
+                &mut visuals,
+                &event_loop_proxy,
+            ),
+            Event::MainEventsCleared => {
+                if !game_context.paused {
+                    let begin = Instant::now();
+                    let update_delay = begin - last_game_update;
+                    if (update_delay + last_update_duration) >= game_context.update_time {
+                        game.step();
+                        last_game_update = Instant::now();
+                        last_update_duration = last_game_update - begin;
+                        visuals.get_window().request_redraw();
+                    }
+                }
+            }
+            Event::RedrawRequested(_) => {
+                visuals.update_pixel_buffer(&game, decay_decider);
+                if visuals.render().is_err() {
+                    eprintln!("Error: Could not render to pixel buffer!");
+                    *control_flow = ControlFlow::Exit;
+                    return;
+                }
+            }
+            _ => (),
+        }
+    });
+}
+
+// Should not depend on raw input state such as key presses, modifier state or mouse state
+// That should already be translated into a specific game event
+fn on_user_event(
+    event: UserEvent,
+    game: &mut ConwaysGame,
+    game_context: &mut GameContext,
+    visuals: &mut Visuals,
+    event_loop_proxy: &EventLoopProxy<UserEvent>,
+) {
+    match event {
+        UserEvent::StepCell { x, y } => {
+            if let Some((last_x, last_y)) = game_context.last_cell_stepped {
+                if last_x == x && last_y == y {
+                    return;
+                }
+            }
+            game.next_cell(x, y);
+            game_context.last_cell_stepped = Some((x, y));
+            visuals.get_window().request_redraw();
+        }
+        _ => {}
+    }
+}
+
+fn make_window<T>(title: &str, event_loop: &EventLoop<T>) -> (Window, dpi::PhysicalSize<u32>, f32) {
+    let window = WindowBuilder::new()
+        .with_position(PhysicalPosition::new(0, 0))
+        .with_visible(false)
+        .with_title(title)
+        .build(event_loop)
+        .expect("Could not construct window!");
+    let dpi_factor = window.scale_factor();
+    let window_size = dpi::PhysicalSize::new(globals::DEFAULT_SIZE.0, globals::DEFAULT_SIZE.1);
+    let monitor_size = if let Some(monitor) = window.current_monitor() {
+        monitor.size()
+    } else {
+        window_size
+    };
+    // Scale window to 2/3 of monitor size
+    let scale = (monitor_size.width as f64 / window_size.width as f64 * 2.0 / 3.0)
+        .round()
+        .max(1.0);
+    let inner_size = dpi::PhysicalSize::new(
+        window_size.width as f64 * scale,
+        window_size.height as f64 * scale,
+    );
+    window.set_inner_size(inner_size);
+    window.set_min_inner_size(Some(dpi::PhysicalSize::new(
+        inner_size.width.floor(),
+        inner_size.height.floor(),
+    )));
+    window.set_visible(true);
+    (
+        window,
+        dpi::PhysicalSize::new(inner_size.width as u32, inner_size.height as u32),
+        dpi_factor as f32,
+    )
+}
