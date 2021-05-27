@@ -26,3 +26,7 @@ path = "src/bin/game_of_life/main.rs"
 [[bin]]
 name = "wireworld"
 path = "src/bin/wireworld/main.rs"
+
+[[bin]]
+name = "langtons_ant"
+path = "src/bin/langtons_ant/main.rs"
