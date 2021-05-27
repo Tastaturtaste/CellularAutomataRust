@@ -1,8 +1,4 @@
-use std::{
-    cell::Cell,
-    default,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crate::{
     default_window::make_window, game::traits::CellGame as CellGameTrait, game::CellGame,
@@ -81,6 +77,7 @@ impl<CG: CellGameTrait> GameRunner<CG> {
             .with_position(PhysicalPosition::new(0, 0))
             .with_visible(false)
             .with_fullscreen(Some(Fullscreen::Borderless(None)))
+            .with_title(title)
             .build(&self.event_loop)
             .expect("Could not construct fullscreen window!");
         //let dpi_scaling = window.scale_factor();
@@ -189,7 +186,7 @@ impl traits::UserEvent for UserEvent {}
 
 fn on_mouse_state_updated(
     mouse_state: &MouseState,
-    modifier_state: &ModifiersState,
+    _modifier_state: &ModifiersState,
     visuals: &mut Visuals,
     game_context: &mut GameContext,
     event_loop_proxy: &EventLoopProxy<UserEvent>,
@@ -214,7 +211,7 @@ fn on_keyboard_input<T: CellGameTrait>(
     visuals: &mut Visuals,
     game: &mut T,
     game_context: &mut GameContext,
-    event_loop_proxy: &EventLoopProxy<UserEvent>,
+    _event_loop_proxy: &EventLoopProxy<UserEvent>,
 ) {
     let KeyboardInput {
         scancode: _,
@@ -276,7 +273,7 @@ fn on_user_event<T: CellGameTrait>(
     game: &mut T,
     game_context: &mut GameContext,
     visuals: &mut Visuals,
-    event_loop_proxy: &EventLoopProxy<UserEvent>,
+    _event_loop_proxy: &EventLoopProxy<UserEvent>,
 ) {
     match event {
         UserEvent::StepCell { x, y } => {

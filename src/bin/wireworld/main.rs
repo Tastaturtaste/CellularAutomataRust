@@ -11,7 +11,7 @@ fn main() {
     let height = 1440 / cell_size;
     let border_cell = cell::WireCell::Off;
     let game = wireworld::WireGame::new(width, height, border_cell);
-    let decay_decider = |c: &WireCell| false;
+    let decay_decider = |_c: &WireCell| false;
     let game_runner = GameRunner::new(decay_decider);
     game_runner.run(game, "Wireworld");
 }
