@@ -24,4 +24,4 @@ impl GameRule for ConwayRule {
     }
 }
 
-pub type ConwaysGame = CellGame<CellConway, ConwayRule<Cell = CellConway>>;
+pub type ConwaysGame = CellGame<CellConway, ConwayRule>;

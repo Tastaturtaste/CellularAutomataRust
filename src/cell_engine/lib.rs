@@ -9,3 +9,11 @@ pub mod rgba;
 mod tests;
 mod util;
 pub mod visuals;
+
+#[macro_export]
+macro_rules! dprintln {
+    ($($rest:tt)*) => {
+        #[cfg(debug_assertions)]
+        std::println!($($rest)*)
+    }
+}

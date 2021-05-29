@@ -1,9 +1,9 @@
-use std::time::{Duration, Instant};
-
 use crate::{
-    default_window::make_window, game::traits::CellGame as CellGameTrait, game::CellGame,
+    default_window::make_window, dprintln, game::traits::CellGame as CellGameTrait, game::CellGame,
     game_rules::GameRule, visuals::Visuals,
 };
+// use log::trace;
+use std::time::{Duration, Instant};
 use winit::{
     dpi::{PhysicalPosition, PhysicalSize},
     event::{
@@ -196,7 +196,8 @@ fn on_mouse_state_updated(
         .window_pos_to_pixel(mouse_state.position.into())
         .unwrap_or_else(|pos| visuals.get_buffer().clamp_pixel_pos(pos));
     if let ElementState::Pressed = mouse_state.left {
-        println!("Clicked at {}, {}", x, y);
+        dprintln!("Clicked at {}, {}", x, y);
+        //trace!("Clicked at {}, {}", x, y);
         event_loop_proxy
             .send_event(UserEvent::StepCell { x, y })
             .expect("Sending event to a proxy event loop failed!");
