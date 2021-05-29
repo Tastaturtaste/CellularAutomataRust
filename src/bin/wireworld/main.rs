@@ -3,6 +3,7 @@ mod globals;
 mod wireworld;
 use cell::WireCell;
 use cell_engine::default_game_runner::GameRunner;
+use cell_engine::dprintln;
 use wireworld::*;
 
 fn main() {
