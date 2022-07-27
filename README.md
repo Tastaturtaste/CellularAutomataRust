@@ -1,10 +1,10 @@
 # CellularAutomataRust
 Learning Rust by implementing different Cellular Automata
 
-## How to run
+## How to build the example automatons
 1. Clone the repository
-2. Run ```cargo build --release```
-3. Go into the target/release folder
+2. Run ```cargo build --release --examples```
+3. Go into the target/release/examples folder
 4. Run the exe you want
 
 ## Project structure

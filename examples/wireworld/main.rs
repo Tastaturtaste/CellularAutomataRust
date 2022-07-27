@@ -1,7 +1,7 @@
 mod cell;
 mod wireworld;
 use cell::WireCell;
-use cell_engine::default_game_runner::GameRunner;
+use cell_engine_rs::default_game_runner::GameRunner;
 
 use wireworld::*;
 

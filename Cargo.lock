@@ -96,6 +96,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2fff2a6927b3bb87f9595d67196a70493f627687a71d87a0d692242c33f58c11"
 
 [[package]]
+name = "cell-engine-rs"
+version = "0.1.0"
+dependencies = [
+ "line_drawing",
+ "pixels",
+ "rand",
+ "rayon",
+ "winit",
+]
+
+[[package]]
 name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -394,17 +405,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
 dependencies = [
  "byteorder",
-]
-
-[[package]]
-name = "game_of_life"
-version = "0.1.0"
-dependencies = [
- "line_drawing",
- "pixels",
- "rand",
- "rayon",
- "winit",
 ]
 
 [[package]]

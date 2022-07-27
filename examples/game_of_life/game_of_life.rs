@@ -1,9 +1,9 @@
 use crate::cell::CellConway;
-pub use cell_engine::game::{
+pub use cell_engine_rs::game::{
     traits::{CellGame as CellGameTrait, RandCellGame as RandCellGameTrait},
     CellGame,
 };
-use cell_engine::{game_board::iter::*, game_rules::*};
+use cell_engine_rs::{game_board::iter::*, game_rules::*};
 
 #[derive(Clone, Copy, Default)]
 pub struct ConwayRule {}
