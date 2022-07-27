@@ -1,31 +1,26 @@
 use cell_engine::{
     cell::{Cell, RandomCell},
     default_game_runner::GameRunner,
-    game::{
-        traits::CellGame as CellGameTrait, traits::RandCellGame as RandCellGameTrait, CellGame,
-    },
+    game::{traits::CellGame as CellGameTrait, CellGame},
     game_rules::GameRule,
     rgba::RGBA,
 };
-use rand::{
-    distributions::{Distribution, Standard},
-    Rng,
-};
+use rand::Rng;
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum Ant {
-    NORTH,
-    WEST,
-    SOUTH,
-    EAST,
+    North,
+    West,
+    South,
+    East,
 }
 impl Ant {
     fn next(&self) -> Self {
         match *self {
-            Self::NORTH => Self::EAST,
-            Self::EAST => Self::SOUTH,
-            Self::SOUTH => Self::WEST,
-            Self::WEST => Self::NORTH,
+            Self::North => Self::East,
+            Self::East => Self::South,
+            Self::South => Self::West,
+            Self::West => Self::North,
         }
     }
 }
@@ -41,11 +36,11 @@ impl Cell for LangtonsCell {
         dbg!(*self);
         match *self {
             Black(None) => White(None),
-            White(None) => White(Some(Ant::NORTH)),
-            White(Some(ant)) if ant != Ant::WEST => White(Some(ant.next())),
-            White(Some(Ant::WEST)) => Black(Some(Ant::NORTH)),
-            Black(Some(ant)) if ant != Ant::WEST => Black(Some(ant.next())),
-            Black(Some(Ant::WEST)) => Black(None),
+            White(None) => White(Some(Ant::North)),
+            White(Some(ant)) if ant != Ant::West => White(Some(ant.next())),
+            White(Some(Ant::West)) => Black(Some(Ant::North)),
+            Black(Some(ant)) if ant != Ant::West => Black(Some(ant.next())),
+            Black(Some(Ant::West)) => Black(None),
             _ => unreachable!(),
         }
     }
@@ -74,7 +69,7 @@ fn blend_rgba_factor(rgba_1: RGBA, rgba_2: RGBA, factor: f32) -> RGBA {
     for (i, (&v1, &v2)) in rgba_1.0.iter().zip(rgba_2.0.iter()).enumerate() {
         rgba[i] = (v1 as f32 * factor + v2 as f32 * (1. - factor)) as u8
     }
-    RGBA { 0: rgba }
+    RGBA(rgba)
 }
 
 #[derive(Default, Clone, Copy)]
@@ -99,29 +94,29 @@ impl GameRule for LangtonsRule {
         'label: for (i, &neighbor) in neighbor_iter.enumerate() {
             match (i, neighbor) {
                 (1, neighbor)
-                    if neighbor == White(Some(Ant::EAST)) || neighbor == Black(Some(Ant::WEST)) =>
+                    if neighbor == White(Some(Ant::East)) || neighbor == Black(Some(Ant::West)) =>
                 {
-                    ant = Some(Ant::SOUTH);
+                    ant = Some(Ant::South);
                     break 'label;
                 }
                 (3, neighbor)
-                    if neighbor == White(Some(Ant::SOUTH))
-                        || neighbor == Black(Some(Ant::NORTH)) =>
+                    if neighbor == White(Some(Ant::South))
+                        || neighbor == Black(Some(Ant::North)) =>
                 {
-                    ant = Some(Ant::WEST);
+                    ant = Some(Ant::West);
                     break 'label;
                 }
                 (4, neighbor)
-                    if neighbor == White(Some(Ant::NORTH))
-                        || neighbor == Black(Some(Ant::SOUTH)) =>
+                    if neighbor == White(Some(Ant::North))
+                        || neighbor == Black(Some(Ant::South)) =>
                 {
-                    ant = Some(Ant::EAST);
+                    ant = Some(Ant::East);
                     break 'label;
                 }
                 (6, neighbor)
-                    if neighbor == White(Some(Ant::WEST)) || neighbor == Black(Some(Ant::EAST)) =>
+                    if neighbor == White(Some(Ant::West)) || neighbor == Black(Some(Ant::East)) =>
                 {
-                    ant = Some(Ant::NORTH);
+                    ant = Some(Ant::North);
                     break 'label;
                 }
                 _ => (),
@@ -140,11 +135,7 @@ fn main() {
     let width = 2550 / 8;
     let height = 1440 / 8;
     let game = LangtonsGame::new(width, height, LangtonsCell::Black(None));
-    let overwrite_decaying = |c: &LangtonsCell| match *c {
-        White(Some(_)) => true,
-        Black(Some(_)) => true,
-        _ => false,
-    };
+    let overwrite_decaying = |c: &LangtonsCell| matches!(*c, White(Some(_)) | Black(Some(_)));
     let game_runner = GameRunner::new(overwrite_decaying);
     game_runner.run(game, "Langton's Ant");
 }

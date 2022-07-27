@@ -1,16 +1,13 @@
-use crate::{
-    default_window::make_window, dprintln, game::traits::CellGame as CellGameTrait, game::CellGame,
-    game_rules::GameRule, visuals::Visuals,
-};
+use crate::{dprintln, game::traits::CellGame as CellGameTrait, visuals::Visuals};
 // use log::trace;
 use std::time::{Duration, Instant};
 use winit::{
-    dpi::{PhysicalPosition, PhysicalSize},
+    dpi::PhysicalPosition,
     event::{
         ElementState, Event, KeyboardInput, ModifiersState, MouseButton, VirtualKeyCode,
         WindowEvent,
     },
-    event_loop::{self, ControlFlow, EventLoop, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop, EventLoopProxy},
     window::{Fullscreen, WindowBuilder},
 };
 mod traits {
@@ -117,7 +114,7 @@ impl<CG: CellGameTrait> GameRunner<CG> {
                             &mut visuals,
                             &mut game,
                             &mut game_context,
-                            &&event_loop_proxy,
+                            &event_loop_proxy,
                         );
                     }
                     WindowEvent::CursorMoved { position, .. } => {
@@ -164,11 +161,10 @@ impl<CG: CellGameTrait> GameRunner<CG> {
                     }
                 }
                 Event::RedrawRequested(_) => {
-                    visuals.update_pixel_buffer(&mut game, decay_decider);
+                    visuals.update_pixel_buffer(&game, decay_decider);
                     if visuals.render().is_err() {
                         eprintln!("Error: Could not render to pixel buffer!");
                         *control_flow = ControlFlow::Exit;
-                        return;
                     }
                 }
                 _ => (),
@@ -180,7 +176,6 @@ impl<CG: CellGameTrait> GameRunner<CG> {
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum UserEvent {
     StepCell { x: usize, y: usize },
-    CloseGame,
 }
 impl traits::UserEvent for UserEvent {}
 
@@ -233,7 +228,9 @@ fn on_keyboard_input<T: CellGameTrait>(
                     let mut decay_multi = visuals.get_decay_multiplier();
                     decay_multi += 0.1;
                     decay_multi = decay_multi.clamp(0.0, 1.0);
-                    visuals.set_decay_multiplier(decay_multi);
+                    visuals
+                        .set_decay_multiplier(decay_multi)
+                        .expect("Decay multiplier should only be between 0 and 1!");
                     println!("Increased decay rate to {}", decay_multi);
                 }
                 _ => {
@@ -287,6 +284,5 @@ fn on_user_event<T: CellGameTrait>(
             game_context.last_cell_stepped = Some((x, y));
             visuals.get_window().request_redraw();
         }
-        _ => {}
     }
 }

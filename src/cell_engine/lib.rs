@@ -6,8 +6,6 @@ pub mod game_board;
 pub mod game_rules;
 mod globals;
 pub mod rgba;
-mod tests;
-mod util;
 pub mod visuals;
 
 #[macro_export]

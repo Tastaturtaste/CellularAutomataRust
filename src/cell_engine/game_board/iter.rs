@@ -166,7 +166,6 @@ impl<'a, C: Cell> Iterator for LocalGroupIterator<'a, C> {
         // Bound checks are done above and should not be repeated
         let result = Some((
             unsafe { self.board.get_unchecked_index_outer(self.center as usize) },
-            // self.board.get_index_inner(self.center as usize)?,
             self.board.iter_neighbors_index_outer(self.center),
         ));
         self.center += 1;

@@ -9,14 +9,6 @@ pub trait RandomCell: Cell {
     fn new_rand() -> Self;
 }
 
-mod tests {
-    #[derive(Debug, Clone, Copy, PartialEq)]
-    pub enum CellConway {
-        Dead,
-        Alive,
-    }
-}
-
 pub(crate) mod mock {
     pub use super::*;
     use rand::{

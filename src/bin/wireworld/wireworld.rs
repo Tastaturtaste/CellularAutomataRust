@@ -1,9 +1,8 @@
 use crate::cell::WireCell;
 pub use cell_engine::game::traits::CellGame as CellGameTrait;
 use cell_engine::{
-    cell::*,
     game::CellGame,
-    game_board::{iter::*, GameBoard},
+    game_board::{iter::*},
     game_rules::*,
 };
 
@@ -20,7 +19,7 @@ impl GameRule for WireworldRule {
                 let sum = neighbor_iter
                     .filter(|&cell| *cell == WireCell::ElectronHead)
                     .count();
-                if sum >= 1 && sum <= 2 {
+                if (1..=2).contains(&sum) {
                     WireCell::ElectronHead
                 } else {
                     WireCell::Wire

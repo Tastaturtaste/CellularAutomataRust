@@ -63,10 +63,11 @@ impl Visuals {
         self.decay_multiplier
     }
     pub fn set_decay_multiplier(&mut self, decay_multiplier: f32) -> Result<(), &str> {
-        if decay_multiplier > 1.0 || decay_multiplier < 0.0 {
+        if !(0.0..=1.0).contains(&decay_multiplier) {
             return Err("Out of bounds!");
         }
-        Ok(self.decay_multiplier = decay_multiplier)
+        self.decay_multiplier = decay_multiplier;
+        Ok(())
     }
     pub fn get_window(&self) -> &Window {
         &self.window
