@@ -226,7 +226,7 @@ fn on_keyboard_input<T: CellGameTrait>(
     }
     match virtual_keycode {
         Some(VirtualKeyCode::P) => game_context.paused = !game_context.paused,
-        Some(VirtualKeyCode::NumpadAdd) => {
+        Some(VirtualKeyCode::PageUp) => {
             match *modifier_state {
                 ModifiersState::SHIFT => {
                     // Since a higher value implies a higher decay rate we add to make decay faster
@@ -242,7 +242,7 @@ fn on_keyboard_input<T: CellGameTrait>(
                 }
             }
         }
-        Some(VirtualKeyCode::NumpadSubtract) => {
+        Some(VirtualKeyCode::PageDown) => {
             match *modifier_state {
                 ModifiersState::SHIFT => {
                     // Since a bigger value implies a lower decay rate we subtract to make decay slower
