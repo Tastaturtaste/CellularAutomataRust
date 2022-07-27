@@ -1,16 +1,16 @@
 # CellularAutomataRust
 Learning Rust by implementing different Cellular Automata
 
-## How to run
+## How to build the example automatons
 1. Clone the repository
-2. Run ```cargo build --release```
-3. Go into the target/release folder
+2. Run ```cargo build --release --examples```
+3. Go into the target/release/examples folder
 4. Run the exe you want
 
 ## Project structure
-The project consists mostly of a library, ```cell_engine```, implementing visualization, controls and other stuff common to cellular automata. 
-This library is then used in multiple different cellular automata binaries, which have to implement game specific stuff such as update rules and cell varieties.
-To build a new cellular automata with the library, only one function has to be called with a structure implementing some traits exposed by a library. 
+The project consists of a library, ```cell_engine_rs```, implementing visualization, controls and other stuff common to cellular automata. 
+This library is then used in multiple different cellular automata examples, which only have to implement game specific stuff such as update rules and cell varieties.
+To build a new cellular automata with the library, only one function has to be called with a structure implementing some traits exposed by the library. 
 
 ## Controls
 - P: Toggle pause

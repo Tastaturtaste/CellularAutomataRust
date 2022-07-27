@@ -1,5 +1,5 @@
-pub use cell_engine::cell::*;
-use cell_engine::rgba::RGBA;
+pub use cell_engine_rs::cell::*;
+use cell_engine_rs::rgba::RGBA;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum WireCell {

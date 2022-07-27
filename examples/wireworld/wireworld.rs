@@ -1,10 +1,6 @@
 use crate::cell::WireCell;
-pub use cell_engine::game::traits::CellGame as CellGameTrait;
-use cell_engine::{
-    game::CellGame,
-    game_board::{iter::*},
-    game_rules::*,
-};
+pub use cell_engine_rs::game::traits::CellGame as CellGameTrait;
+use cell_engine_rs::{game::CellGame, game_board::iter::*, game_rules::*};
 
 #[derive(Default, Clone, Copy)]
 pub struct WireworldRule {}

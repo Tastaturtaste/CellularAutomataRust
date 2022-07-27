@@ -1,5 +1,5 @@
-pub use cell_engine::cell::{Cell, RandomCell};
-use cell_engine::rgba::RGBA;
+pub use cell_engine_rs::cell::{Cell, RandomCell};
+use cell_engine_rs::rgba::RGBA;
 use rand::{
     distributions::{Distribution, Standard},
     Rng,

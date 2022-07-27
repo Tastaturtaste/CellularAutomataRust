@@ -1,4 +1,4 @@
-use cell_engine::{
+use cell_engine_rs::{
     cell::{Cell, RandomCell},
     default_game_runner::GameRunner,
     game::{traits::CellGame as CellGameTrait, CellGame},
@@ -80,7 +80,7 @@ impl GameRule for LangtonsRule {
 
     fn apply(
         cell: &Self::Cell,
-        neighbor_iter: cell_engine::game_board::iter::NeighborhoodIterator<Self::Cell>,
+        neighbor_iter: cell_engine_rs::game_board::iter::NeighborhoodIterator<Self::Cell>,
     ) -> Self::Cell {
         match *cell {
             White(Some(_)) => return Black(None),

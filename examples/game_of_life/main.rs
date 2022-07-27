@@ -1,8 +1,8 @@
 mod cell;
 mod game_of_life;
 use cell::CellConway;
-use cell_engine::default_game_runner::GameRunner;
-use cell_engine::game::traits::*;
+use cell_engine_rs::default_game_runner::GameRunner;
+use cell_engine_rs::game::traits::*;
 use game_of_life::ConwaysGame;
 
 fn main() {
